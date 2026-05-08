@@ -3,7 +3,9 @@ const http = require('http');
 const crypto = require('crypto');
 
 const CHROME_PATH = process.env.CHROME_PATH || '/usr/bin/google-chrome';
-const CDN_BASE = 'https://z-cdn.chatglm.cn/z-ai/frontend/prod-fe-1.0.252/_app/immutable/chunks/';
+// Full URL to the signature chunk — set ZAI_CDN_CHUNK env var to override when Z.ai upgrades its frontend
+const CDN_CHUNK = process.env.ZAI_CDN_CHUNK ||
+  'https://z-cdn.chatglm.cn/z-ai/frontend/prod-fe-1.0.252/_app/immutable/chunks/CAm9rDEa.js';
 const ZAI_BASE = 'https://chat.z.ai';
 const PORT = process.env.PORT || 9876;
 
@@ -19,11 +21,11 @@ async function init() {
   page = await browser.newPage();
   await page.goto(ZAI_BASE + '/', { waitUntil: 'networkidle2', timeout: 30000 });
   console.log('[+] Page loaded');
-  await page.evaluate(async (cdnBase) => {
-    window.__zaiMod = await import(cdnBase + 'CAm9rDEa.js');
+  await page.evaluate(async (chunkUrl) => {
+    window.__zaiMod = await import(chunkUrl);
     window.__zaiYM = window.__zaiMod.b0;
     window.__zaiMM = window.__zaiMod.b1;
-  }, CDN_BASE);
+  }, CDN_CHUNK);
   console.log('[+] Signature module loaded');
 }
 
@@ -31,11 +33,11 @@ async function refreshSession() {
   console.log('[*] Refreshing guest session...');
   await page.evaluate(() => localStorage.removeItem('token'));
   await page.reload({ waitUntil: 'networkidle2' });
-  await page.evaluate(async (cdnBase) => {
-    window.__zaiMod = await import(cdnBase + 'CAm9rDEa.js');
+  await page.evaluate(async (chunkUrl) => {
+    window.__zaiMod = await import(chunkUrl);
     window.__zaiYM = window.__zaiMod.b0;
     window.__zaiMM = window.__zaiMod.b1;
-  }, CDN_BASE);
+  }, CDN_CHUNK);
   console.log('[+] Session refreshed');
 }
 

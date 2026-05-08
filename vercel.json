@@ -1,0 +1,18 @@
+{
+  "functions": {
+    "api/chat.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/models.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    { "source": "/v1/chat/completions", "destination": "/api/chat" },
+    { "source": "/chat/completions",    "destination": "/api/chat" },
+    { "source": "/v1/models",           "destination": "/api/models" },
+    { "source": "/models",              "destination": "/api/models" }
+  ]
+}
