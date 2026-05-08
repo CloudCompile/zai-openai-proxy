@@ -6,7 +6,13 @@
   "scripts": {
     "start": "node zai-proxy.js"
   },
-  "keywords": ["openai", "proxy", "z.ai", "zhipu", "glm"],
+  "keywords": [
+    "openai",
+    "proxy",
+    "z.ai",
+    "zhipu",
+    "glm"
+  ],
   "license": "MIT",
   "dependencies": {
     "puppeteer-core": "^24.38.0"

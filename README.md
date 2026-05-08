@@ -136,6 +136,7 @@ for chunk in response:
 |----------|---------|-------------|
 | `CHROME_PATH` | `/usr/bin/google-chrome` | Path to Chrome/Chromium binary |
 | `PORT` | `9876` | Proxy server port |
+| `ZAI_CDN_CHUNK` | `https://z-cdn.chatglm.cn/…/CAm9rDEa.js` | Full URL to the Z.ai signature chunk — update when Z.ai ships a new frontend version |
 
 ## Available Models
 
@@ -146,11 +147,89 @@ Models are fetched dynamically from Z.ai. Common ones include:
 - `glm-4-plus` — Enhanced GLM-4
 - And more (check `/v1/models`)
 
+## Deploy to Vercel
+
+You can run this proxy on Vercel's **free Hobby plan** — no Pro plan needed. The Vercel functions load the Z.ai signature module directly in Node.js (no headless browser), so cold starts take ~1–3 seconds, well within the free-tier 10-second function timeout.
+
+### What you need
+
+| Requirement | Notes |
+|---|---|
+| Vercel account | [vercel.com](https://vercel.com) — **free Hobby plan works** |
+| Node.js ≥ 18 | Required locally to run the Vercel CLI |
+
+### Step 1 — Deploy
+
+```bash
+# Install Vercel CLI if you don't have it
+npm i -g vercel
+
+# Clone and enter the repo
+git clone https://github.com/CloudCompile/zai-openai-proxy.git
+cd zai-openai-proxy
+npm install
+
+# Deploy (follow the prompts — link to your project)
+vercel --prod
+```
+
+That's it. No environment variables are required to get started.
+
+### Step 2 — Use your deployment
+
+Replace `https://your-project.vercel.app` with your actual Vercel URL:
+
+```bash
+# List models
+curl https://your-project.vercel.app/v1/models
+
+# Chat completion
+curl https://your-project.vercel.app/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "glm-5",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "stream": false
+  }'
+```
+
+**OpenAI SDK (Python):**
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://your-project.vercel.app/v1",
+    api_key="unused",
+)
+response = client.chat.completions.create(
+    model="glm-5",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+print(response.choices[0].message.content)
+```
+
+### How it works (no browser needed)
+
+On a cold start the function does two things in parallel (~1–3 s total):
+
+1. **`GET https://chat.z.ai/api/v1/auths/`** — auto-creates an anonymous guest JWT
+2. **Fetches the Z.ai signature chunk** (~124 KB) from the CDN and imports it via Node.js 18's native `import('data:text/javascript;base64,...')` — the module's RC4-obfuscated HMAC signing logic runs as-is with mocked browser fingerprint globals
+
+Both the module and the token are cached at module scope, so **warm requests skip the cold start entirely** and respond in 2–5 s.
+
+### Optional environment variable
+
+| Variable | Default | Description |
+|---|---|---|
+| `ZAI_CDN_CHUNK` | `https://z-cdn.chatglm.cn/…/CAm9rDEa.js` | Full URL to the Z.ai signature chunk — set this if Z.ai ships a new frontend version and the default URL stops working |
+
+---
+
 ## Limitations
 
 - Guest sessions have rate limits imposed by Z.ai
-- Requires a running Chrome instance (headless)
-- The CDN chunk hash (`CAm9rDEa.js`) may change on frontend updates
+- The CDN chunk hash (`CAm9rDEa.js`) may change on Z.ai frontend updates (update `ZAI_CDN_CHUNK` if needed)
 
 ## License
 
