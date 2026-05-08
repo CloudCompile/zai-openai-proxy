@@ -2,8 +2,7 @@
 
 const crypto = require('crypto');
 const {
-  getPage,
-  refreshSession,
+  refreshToken,
   generateSignedRequest,
   makeChunk,
   makeCompletion,
@@ -35,14 +34,13 @@ module.exports = async function handler(req, res) {
 
     console.log(`[>] ${model} | ${messages.length} msgs | stream=${wantStream} | search=${webSearch} | tools=${tools ? tools.length : 0}`);
 
-    const page = await getPage();
-    const signed = await generateSignedRequest(page, model, messages, { enableThinking, webSearch, tools, toolChoice });
+    const signed = await generateSignedRequest(model, messages, { enableThinking, webSearch, tools, toolChoice });
     const upstream = await fetch(signed.url, { method: 'POST', headers: signed.headers, body: signed.body });
 
     if (!upstream.ok) {
       const err = await upstream.text();
       console.error(`[-] ${upstream.status}: ${err.substring(0, 200)}`);
-      if (upstream.status === 401) await refreshSession(page);
+      if (upstream.status === 401) await refreshToken();
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Access-Control-Allow-Origin', '*');
       return res.status(upstream.status).end(

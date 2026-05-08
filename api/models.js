@@ -1,6 +1,6 @@
 'use strict';
 
-const { getPage, getModels } = require('./_lib');
+const { getModels } = require('./_lib');
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -11,8 +11,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const page = await getPage();
-    const ids = await getModels(page);
+    const ids = await getModels();
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).end(

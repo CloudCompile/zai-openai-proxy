@@ -149,28 +149,16 @@ Models are fetched dynamically from Z.ai. Common ones include:
 
 ## Deploy to Vercel
 
-You can run this proxy as a serverless app on Vercel. Each request boots a headless Chromium instance (cached across warm invocations), so a **Pro plan** (60-second function timeout) is required — the free-tier 10-second limit is too short for a cold start.
+You can run this proxy on Vercel's **free Hobby plan** — no Pro plan needed. The Vercel functions load the Z.ai signature module directly in Node.js (no headless browser), so cold starts take ~1–3 seconds, well within the free-tier 10-second function timeout.
 
 ### What you need
 
 | Requirement | Notes |
 |---|---|
-| Vercel account | [vercel.com](https://vercel.com) — **Pro plan** needed for the 60 s timeout |
-| Chromium pack URL | A public URL to an `@sparticuz/chromium` binary (see below) |
+| Vercel account | [vercel.com](https://vercel.com) — **free Hobby plan works** |
+| Node.js ≥ 18 | Required locally to run the Vercel CLI |
 
-### Step 1 — Get a Chromium pack URL
-
-The Chromium binary is too large to bundle with your deployment, so it is downloaded at cold-start from a URL you supply.
-
-The easiest option is to grab a pre-built release directly from GitHub:
-
-```
-https://github.com/Sparticuz/chromium/releases/download/v148.0.0/chromium-v148.0.0-pack.tar
-```
-
-> **Production tip:** GitHub releases can hit rate limits under heavy traffic. Upload the `.tar` file to your own S3 bucket, Cloudflare R2, or any public CDN and use that URL instead.
-
-### Step 2 — Deploy
+### Step 1 — Deploy
 
 ```bash
 # Install Vercel CLI if you don't have it
@@ -182,31 +170,12 @@ cd zai-openai-proxy
 npm install
 
 # Deploy (follow the prompts — link to your project)
-vercel
-```
-
-### Step 3 — Set the environment variable
-
-In the Vercel dashboard → your project → **Settings → Environment Variables**, add:
-
-| Name | Value |
-|---|---|
-| `CHROMIUM_PACK` | `https://github.com/Sparticuz/chromium/releases/download/v148.0.0/chromium-v148.0.0-pack.tar` |
-
-Or set it from the CLI:
-
-```bash
-vercel env add CHROMIUM_PACK
-# paste the URL when prompted, select all environments
-```
-
-Then redeploy so the variable takes effect:
-
-```bash
 vercel --prod
 ```
 
-### Step 4 — Use your deployment
+That's it. No environment variables are required to get started.
+
+### Step 2 — Use your deployment
 
 Replace `https://your-project.vercel.app` with your actual Vercel URL:
 
@@ -240,26 +209,27 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-### How warm starts work
+### How it works (no browser needed)
 
-The first request to a cold function instance downloads Chromium (~50 MB) to `/tmp` and boots the browser — this takes 15–30 seconds. Subsequent requests to the **same warm instance** reuse the cached browser and respond in 2–5 seconds. Vercel keeps function instances warm for several minutes of inactivity.
+On a cold start the function does two things in parallel (~1–3 s total):
 
-### Vercel-specific environment variables
+1. **`GET https://chat.z.ai/api/v1/auths/`** — auto-creates an anonymous guest JWT
+2. **Fetches the Z.ai signature chunk** (~124 KB) from the CDN and imports it via Node.js 18's native `import('data:text/javascript;base64,...')` — the module's RC4-obfuscated HMAC signing logic runs as-is with mocked browser fingerprint globals
+
+Both the module and the token are cached at module scope, so **warm requests skip the cold start entirely** and respond in 2–5 s.
+
+### Optional environment variable
 
 | Variable | Default | Description |
 |---|---|---|
-| `CHROMIUM_PACK` | *(required)* | URL to the `@sparticuz/chromium` pack `.tar` file |
-| `ZAI_CDN_CHUNK` | `https://z-cdn.chatglm.cn/…/CAm9rDEa.js` | Full URL to the Z.ai signature chunk — update this if Z.ai ships a new frontend version |
-| `PORT` | N/A | Not used on Vercel (Vercel manages the port) |
+| `ZAI_CDN_CHUNK` | `https://z-cdn.chatglm.cn/…/CAm9rDEa.js` | Full URL to the Z.ai signature chunk — set this if Z.ai ships a new frontend version and the default URL stops working |
 
 ---
 
 ## Limitations
 
 - Guest sessions have rate limits imposed by Z.ai
-- Requires a running Chrome instance (headless)
-- The CDN chunk hash (`CAm9rDEa.js`) may change on frontend updates
-- Vercel deployment requires a **Pro plan** for the 60-second function timeout
+- The CDN chunk hash (`CAm9rDEa.js`) may change on Z.ai frontend updates (update `ZAI_CDN_CHUNK` if needed)
 
 ## License
 
